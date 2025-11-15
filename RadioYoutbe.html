@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Radio en Vivo - YouTube Audio</title>
+<style>
+    body { font-family: Arial; background:#111; color:#fff; padding:20px; }
+    .card { max-width:600px; margin:auto; background:#1e1e1e; padding:20px;
+            border-radius:10px; box-shadow:0 0 10px #000; }
+    input, button { padding:10px; margin-top:10px; width:100%; border-radius:6px; border:none; }
+    button { background:#0078ff; color:#fff; cursor:pointer; }
+    button:hover { opacity:0.9; }
+    #status { margin-top:10px; font-size:14px; }
+    iframe { width:1px; height:1px; border:0; opacity:0; }
+</style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Radio — Audio desde YouTube Live</h2>
+
+    <label>📺 Pegá el enlace del vivo de YouTube:</label>
+    <input type="text" id="yturl" placeholder="https://youtube.com/live/XXXXXXXXX" />
+
+    <button onclick="loadVideo()">Cargar transmisión</button>
+    <button onclick="togglePlay()">▶ Reproducir / Detener</button>
+    <button onclick="toggleMute()">🔇 Silencio (M)</button>
+
+    <div id="status">Estado: esperando…</div>
+
+    <iframe id="player"></iframe>
+</div>
+
+<script>
+let player;
+let isMuted = true;
+let isPlaying = false;
+let retryTimer;
+
+function extractID(url) {
+    return url.split("live/")[1]?.split("?")[0] ||
+           url.split("v=")[1]?.split("&")[0] || "";
+}
+
+function loadVideo() {
+    clearInterval(retryTimer);
+
+    const url = document.getElementById("yturl").value.trim();
+    const id = extractID(url);
+
+    if (!id) {
+        document.getElementById("status").textContent = "Error: enlace inválido";
+        return;
+    }
+
+    const iframe = document.getElementById("player");
+    iframe.src =
+      `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&mute=1&playsinline=1&enablejsapi=1&rel=0`;
+
+    isMuted = true;
+    isPlaying = true;
+
+    document.getElementById("status").textContent = "Cargando transmisión…";
+
+    retryTimer = setInterval(() => {
+        if (!isPlaying) return;
+        iframe.contentWindow.postMessage(JSON.stringify({
+            event:"command", func:"playVideo"
+        }), "*");
+    }, 5000);
+}
+
+function togglePlay() {
+    const iframe = document.getElementById("player");
+    isPlaying = !isPlaying;
+
+    iframe.contentWindow.postMessage(JSON.stringify({
+        event:"command",
+        func: isPlaying ? "playVideo" : "pauseVideo"
+    }), "*");
+
+    document.getElementById("status").textContent =
+        isPlaying ? "Reproduciendo…" : "Detenido";
+}
+
+function toggleMute() {
+    const iframe = document.getElementById("player");
+    isMuted = !isMuted;
+
+    iframe.contentWindow.postMessage(JSON.stringify({
+        event:"command",
+        func: isMuted ? "mute" : "unMute"
+    }), "*");
+
+    document.getElementById("status").textContent =
+        isMuted ? "Silenciado" : "Con sonido";
+}
+
+document.addEventListener("keydown", e => {
+    if (e.key.toLowerCase() === "m") toggleMute();
+    if (e.key.toLowerCase() === "a") togglePlay();
+});
+</script>
+
+</body>
+</html>
