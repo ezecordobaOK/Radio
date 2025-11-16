@@ -11,7 +11,7 @@
     button { background:#0078ff; color:#fff; cursor:pointer; }
     button:hover { opacity:0.9; }
     #status { margin-top:10px; font-size:14px; }
-    iframe { width:1px; height:1px; border:0; opacity:0; }
+    #player { width:1px; height:1px; opacity:0; border:0; }
 </style>
 </head>
 <body>
@@ -28,23 +28,42 @@
 
     <div id="status">Estado: esperando…</div>
 
-    <iframe id="player"></iframe>
+    <div id="player"></div>
 </div>
+
+<!-- API oficial de YouTube -->
+<script src="https://www.youtube.com/iframe_api"></script>
 
 <script>
 let player;
 let isMuted = true;
 let isPlaying = false;
-let retryTimer;
 
 function extractID(url) {
     return url.split("live/")[1]?.split("?")[0] ||
            url.split("v=")[1]?.split("&")[0] || "";
 }
 
-function loadVideo() {
-    clearInterval(retryTimer);
+// YouTube API carga este callback automáticamente
+function onYouTubeIframeAPIReady() {
+    player = new YT.Player('player', {
+        height: '1',
+        width: '1',
+        videoId: '',
+        playerVars: {
+            autoplay: 1,
+            controls: 0,
+            mute: 1,
+            rel: 0,
+            playsinline: 1
+        },
+        events: {
+            onReady: () => document.getElementById("status").textContent = "Listo para cargar transmisión"
+        }
+    });
+}
 
+function loadVideo() {
     const url = document.getElementById("yturl").value.trim();
     const id = extractID(url);
 
@@ -53,44 +72,29 @@ function loadVideo() {
         return;
     }
 
-    const iframe = document.getElementById("player");
-    iframe.src =
-      `https://www.youtube.com/embed/${id}?autoplay=1&controls=0&mute=1&playsinline=1&enablejsapi=1&rel=0`;
-
+    player.loadVideoById(id);
+    player.mute();
     isMuted = true;
     isPlaying = true;
 
     document.getElementById("status").textContent = "Cargando transmisión…";
-
-    retryTimer = setInterval(() => {
-        if (!isPlaying) return;
-        iframe.contentWindow.postMessage(JSON.stringify({
-            event:"command", func:"playVideo"
-        }), "*");
-    }, 5000);
 }
 
 function togglePlay() {
-    const iframe = document.getElementById("player");
-    isPlaying = !isPlaying;
+    if (isPlaying) player.pauseVideo();
+    else player.playVideo();
 
-    iframe.contentWindow.postMessage(JSON.stringify({
-        event:"command",
-        func: isPlaying ? "playVideo" : "pauseVideo"
-    }), "*");
+    isPlaying = !isPlaying;
 
     document.getElementById("status").textContent =
         isPlaying ? "Reproduciendo…" : "Detenido";
 }
 
 function toggleMute() {
-    const iframe = document.getElementById("player");
-    isMuted = !isMuted;
+    if (isMuted) player.unMute();
+    else player.mute();
 
-    iframe.contentWindow.postMessage(JSON.stringify({
-        event:"command",
-        func: isMuted ? "mute" : "unMute"
-    }), "*");
+    isMuted = !isMuted;
 
     document.getElementById("status").textContent =
         isMuted ? "Silenciado" : "Con sonido";
